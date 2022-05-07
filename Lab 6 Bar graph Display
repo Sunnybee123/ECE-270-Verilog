@@ -1,0 +1,71 @@
+`default_nettype none
+// Empty top module
+
+module top (
+  // I/O ports
+  input  logic hz100, reset,
+  input  logic [20:0] pb,
+  output logic [7:0] left, right,
+         ss7, ss6, ss5, ss4, ss3, ss2, ss1, ss0,
+  output logic red, green, blue,
+
+  // Ports from/to UART
+  output logic [7:0] txdata,
+  input  logic [7:0] rxdata,
+  output logic txclk, rxclk,
+  input  logic txready, rxready
+);
+
+  bargraph b1 (.inner(pb[15:0]), .outer(   {left[7:0],right[7:0]}      ));
+  decode3to8 b2 (.in(pb[2:0]), .out(    {ss7[7],ss6[7],ss5[7],ss4[7],ss3[7],ss2[7],ss1[7],ss0[7]}   ));
+
+
+  // Your code goes here...
+  assign ss0[0] = pb[0];
+  assign ss0[1] = pb[1];
+  assign ss0[2] = pb[2];
+  assign ss0[3] = pb[3];
+  assign ss0[4] = pb[4];
+  assign ss0[5] = pb[5];
+  assign ss0[6] = pb[6];
+endmodule
+
+// Add more modules down here...
+module bargraph (
+    input logic [15:0] inner,
+    
+    output logic [15:0] outer
+    );
+    assign outer[0] = |inner[15:0];
+    assign outer[1] = |inner[15:1];
+    assign outer[2] = |inner[15:2];
+    assign outer[3] = |inner[15:3];
+    assign outer[4] = |inner[15:4];
+    assign outer[5] = |inner[15:5];
+    assign outer[6] = |inner[15:6];
+    assign outer[7] = |inner[15:7];
+    assign outer[8] = |inner[15:8];
+    assign outer[9] = |inner[15:9];
+    assign outer[10] = |inner[15:10];
+    assign outer[11] = |inner[15:11];
+    assign outer[12] = |inner[15:12];
+    assign outer[13] = |inner[15:13];
+    assign outer[14] = |inner[15:14];
+    assign outer[15] = |inner[15];
+endmodule
+
+module decode3to8 (
+    input logic [2:0] in,
+    
+    output logic [7:0] out
+    );
+    
+    assign out[0] = ~in[2]&~in[1]&~in[0];
+    assign out[1] = ~in[2]&~in[1]&in[0];
+    assign out[2] = ~in[2]&in[1]&~in[0];
+    assign out[3] = ~in[2]&in[1]&in[0];
+    assign out[4] = in[2]&~in[1]&~in[0];
+    assign out[5] = in[2]&~in[1]&in[0];
+    assign out[6] = in[2]&in[1]&~in[0];
+    assign out[7] = in[2]&in[1]&in[0];
+endmodule
