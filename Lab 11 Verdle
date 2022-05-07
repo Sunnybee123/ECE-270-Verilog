@@ -1,0 +1,250 @@
+module top (
+  // I/O ports
+  input  hz100, reset,
+  input  [20:0] pb,
+  output [7:0] left, right,
+         ss7, ss6, ss5, ss4, ss3, ss2, ss1, ss0,
+  output red, green, blue,
+
+  // UART ports
+  output [7:0] txdata,
+  input  [7:0] rxdata,
+  output txclk, rxclk,
+  input  txready, rxready
+);
+  //fr_counter frc (.clk(hz100), .rst(reset), .enable(pb[0]), .out(right));
+  wordcmp wcmp (.guessed("desert"), .selected("design"), .in_word(right[5:0]), .in_place(left[5:0]));
+  // Your code goes here...
+  
+endmodule
+
+module fr_counter (out,enable,clk,rst);
+
+output [7:0] out;
+input enable, clk, rst;
+reg[7:0] out;
+
+  always_ff @(posedge clk)
+    if (rst) begin
+      out <= 8'b0;
+      end
+    else if (enable) begin
+      out <= out + 1;
+      end
+endmodule
+
+module wordcmp (guessed,selected,in_word,in_place);
+  input [47:0] guessed;
+  input [47:0] selected;
+  output [5:0] in_word;
+  output [5:0] in_place;
+  
+  assign in_place = {
+    (guessed[5] == selected[5])? in_place[5] == 1: in_place[5] == 0,
+    (guessed[4] == selected[4])? in_place[4] == 1: in_place[4] == 0,
+    (guessed[3] == selected[3])? in_place[3] == 1: in_place[3] == 0,
+    (guessed[2] == selected[2])? in_place[2] == 1: in_place[2] == 0,
+    (guessed[1] == selected[1])? in_place[1] == 1: in_place[1] == 0,
+    (guessed[0] == selected[0])? in_place[0] == 1: in_place[0] == 0
+  };
+  
+  always_comb 
+  begin
+    case (guessed[0])
+      selected[1] == 1 : in_word[0] <= 1;
+      selected[2] == 1 : in_word[0] <= 1;
+      selected[3] == 1 : in_word[0] <= 1;
+      selected[4] == 1 : in_word[0] <= 1;
+      selected[5] == 1 : in_word[0] <= 1;
+      default: in_word[0] = 0;
+    endcase
+    
+    case (guessed[1])
+      selected[0] <= 1 : in_word[1] <= 1;
+      selected[2] <= 1 : in_word[1] <= 1;
+      selected[3] <= 1 : in_word[1] <= 1;
+      selected[4] <= 1 : in_word[1] <= 1;
+      selected[5] <= 1 : in_word[1] <= 1;
+      default: in_word[1] = 0;
+    endcase
+    
+    case (guessed[2])
+      selected[0] == 1 : in_word[2] == 1;
+      selected[1] <= 1 : in_word[2] <= 1;
+      selected[3] <= 1 : in_word[2] <= 1;
+      selected[4] <= 1 : in_word[2] <= 1;
+      selected[5] <= 1 : in_word[2] <= 1;
+      default: in_word[2] = 0;
+    endcase
+    
+    case (guessed[3])
+      selected[0] <= 1 : in_word[3] <= 1;
+      selected[1] <= 1 : in_word[3] <= 1;
+      selected[2] <= 1 : in_word[3] <= 1;
+      selected[4] <= 1 : in_word[3] <= 1;
+      selected[5] <= 1 : in_word[3] <= 1;
+      default: in_word[3] = 0;
+    endcase
+    
+    case (guessed[4])
+      selected[0] <= 1 : in_word[4] <= 1;
+      selected[1] <= 1 : in_word[4] <= 1;
+      selected[2] <= 1 : in_word[4] <= 1;
+      selected[3] <= 1 : in_word[4] <= 1;
+      selected[5] <= 1 : in_word[4] <= 1;
+      default: in_word[4] = 0;
+    endcase
+    
+    case (guessed[5])
+      selected[0] <= 1 : in_word[5] <= 1;
+      selected[1] <= 1 : in_word[5] <= 1;
+      selected[2] <= 1 : in_word[5] <= 1;
+      selected[3] <= 1 : in_word[5] <= 1;
+      selected[4] <= 1 : in_word[5] <= 1;
+      default: in_word[5] = 0;
+    endcase
+  end
+endmodule
+
+module printer (
+input clk,rst,activate,txready,
+input logic [2:0] num,
+input [7:0] char_in,
+output txclk,done_printing,
+output [7:0] txdata
+);
+
+  // Sets of messages from which the printer will select one, and send out
+  logic [511:0] msg [7:0];
+  assign msg[0] = {272'b0, "Ready to play? Press any key: "};
+  assign msg[1] = {440'b0, "\r\nGuess: "};
+  assign msg[2] = {152'b0, "You win!  Press 3-0-W on the FPGA to reset.\r\n"};
+  // when user is entering characters, print them so user can see what they're typing
+  // this is also called echoback
+  assign msg[3] = {504'b0, char_in};
+  // COLOR_Y - to color the next letter yellow
+  assign msg[4] = {472'b0, 8'h1b, 8'h5b, 8'h33, 8'h33, 8'h6d};
+  // COLOR_G - to color the next letter green
+  assign msg[5] = {472'b0, 8'h1b, 8'h5b, 8'h33, 8'h32, 8'h6d};
+  // COLOR_W - to color the next letter white
+  assign msg[6] = {472'b0, 8'h1b, 8'h5b, 8'h33, 8'h37, 8'h6d};
+  // unused, so we'll initialize to zero
+  assign msg[7] = 512'b0;
+
+  // this section sets the number of characters for each message
+  // so that the printer knows where to stop
+  logic [15:0] len, senlen;
+  always_comb begin
+    case(num)
+      0: senlen = 30*8;
+      1: senlen = 9*8;
+      2: senlen = 46*8;
+      3: senlen = 1*8;  
+      4,5,6: senlen = 5*8;
+      default: senlen = 0;
+    endcase
+  end
+  
+  // are we printing anything at all? 
+  logic printing;
+  // if true, set data before clock, otherwise assert clock
+  logic set_data;
+
+  // use the indentation to determine whether a statement falls beneath an if/else statement!
+  always_ff @(posedge clk, posedge rst)
+    if (rst) 
+    begin
+    txclk <= 0;
+    txdata <= 0;
+    done_printing <= 0;
+    printing <= 0;
+    set_data <= 0;
+    end
+    else 
+    begin
+      if (activate == 0 && printing ==0 && done_printing == 1)
+        done_printing <= 0;
+      else if(activate == 1 && printing == 0)
+        begin
+          set_data <= 0;
+          printing <= 1;
+          done_printing <= 0;
+          len <= senlen;
+          end
+      else if (printing == 1 && len == 0)
+      begin
+        printing <= 0;
+        txclk <= 0;
+        set_data <= 0;
+        done_printing <= 1;
+      end
+      else if (txready == 1 && printing == 1)
+     begin
+        if(~set_data) 
+        begin       // set our data BEFORE clock, so that we do not have setup time violations
+          if (num == 3 && char_in == 127)            // if the character being received is a backspace
+            txdata <= 8'd8;                     // send the code for a backspace to make your cursor move left!
+          else
+            txdata <= msg[num][(len - 1) -: 8];
+            txclk <= 0;
+            set_data <= 1;
+        end
+        else 
+        begin
+          txclk <= 1;
+          set_data <= 0;
+          len <= len - 8;
+        end
+      end
+    end
+
+endmodule
+
+module ssdisplay (
+
+input logic [5:0] in_word,
+input logic [5:0] in_place,
+output logic [63:0] ssout
+);
+
+  localparam CHAR_G = 8'b01101111;
+  localparam CHAR_O = 8'b00111111;
+  localparam CHAR_D = 8'b01011110;
+  localparam CHAR_J = 8'b00001111;
+  localparam CHAR_B = 8'b01111100;
+  localparam CHAR_Y = 8'b01101110;
+  
+  always_comb begin
+    if (&in_place == 1'b1 )
+      ssout = {CHAR_G, CHAR_O, CHAR_O, CHAR_D, 8'b0, CHAR_J, CHAR_O, CHAR_B};
+    else begin
+      ssout[63:56] = 8'b01000000;     
+      ssout[55:48] = in_place[5]? CHAR_G:
+                     in_word[5] ? CHAR_Y:
+                     8'b0;
+      
+      ssout[47:40] = in_place[4]? CHAR_G:
+                     in_word[4] ? CHAR_Y:
+                     8'b0;
+      
+      ssout[39:32] = in_place[3]? CHAR_G:
+                     in_word[3] ? CHAR_Y:
+                     8'b0;
+                     
+      ssout[31:24] = in_place[2]? CHAR_G:
+                     in_word[2] ? CHAR_Y:
+                     8'b0;
+      
+      ssout[23:16] = in_place[1]? CHAR_G:
+                     in_word[1] ? CHAR_Y:
+                     8'b0;
+      
+      ssout[15:8] = in_place[0]? CHAR_G:
+                     in_word[0] ? CHAR_Y:
+                     8'b0;
+      
+      ssout[7:0] = 8'b01000000;       // we only have six letters
+    end
+  end
+
+endmodule
